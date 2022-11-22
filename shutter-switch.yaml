@@ -1,0 +1,188 @@
+substitutions:
+  name: "rolladen-schalter"
+  friendly_name: "${entity_name} Rolladen-Schalter"
+  project_name: "jannis.shutter_switch"
+  project_version: "0.2"
+  light1_restore_mode: RESTORE_DEFAULT_OFF
+  light2_restore_mode: RESTORE_DEFAULT_OFF
+
+esphome:
+  name: "${name}"
+  name_add_mac_suffix: true
+  project:
+    name: "${project_name}"
+    version: "${project_version}"
+
+
+api:
+
+ota:
+
+logger:
+  baud_rate: 0
+
+mdns:
+  disabled: false
+
+web_server:
+  port: 80
+  include_internal: True
+
+captive_portal:
+
+esp8266:
+  board: esp8285
+  restore_from_flash: true
+
+preferences:
+  flash_write_interval: 1min
+
+# Enable logging
+#logger:
+
+# Enable Home Assistant API
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Note: you may try to comment that line if the Wi-Fi connection is not stable...
+  #power_save_mode: high
+
+sensor:
+  - platform: wifi_signal
+    name: "WiFi Signal - Shutterswitch"
+    update_interval: 1min
+  - platform: uptime
+    name: "${friendly_name} Uptime"
+    disabled_by_default: false
+
+button:
+  - platform: factory_reset
+    name: Restart with Factory Default Settings
+    id: Reset
+
+switch:
+  - platform: gpio
+    id: up_relay
+    pin: GPIO13
+    interlock: [down_relay]
+    restore_mode: ALWAYS_OFF
+
+  - platform: gpio
+    id: down_relay
+    pin: GPIO4
+    interlock: [up_relay]
+    restore_mode: ALWAYS_OFF
+
+
+output:
+  # Button LEDs (1.0 = Blue / 0.0 = Red)
+  - platform: esp8266_pwm
+    pin: GPIO14
+    inverted: true
+    id: led_up
+  - platform: esp8266_pwm
+    pin: GPIO1
+    inverted: true
+    id: led_down
+
+light:
+  # Button LEDs
+  - platform: monochromatic
+    name: "${friendly_name} LED1"
+    disabled_by_default: true
+    id: light_up
+    output: led_up
+    default_transition_length: 500ms
+  - platform: monochromatic
+    name: "${friendly_name} LED2"
+    disabled_by_default: true
+    id: light_down
+    output: led_down
+    default_transition_length: 500ms
+  - platform: status_led
+    name: "${friendly_name} Status LED"
+    disabled_by_default: true
+    pin:
+      number: GPIO0
+      inverted: true
+
+
+binary_sensor:
+  - platform: status
+    name: "${friendly_name} Status"
+
+
+  - platform: gpio
+    id: up_button
+    pin:
+      number: GPIO3
+      inverted: true
+    on_press:
+        - lambda: !lambda |-
+            if (id(shutter1).current_operation == CoverOperation::COVER_OPERATION_IDLE) {
+              id(shutter1).open();
+            } else {
+              id(shutter1).stop();
+            }
+       # - cover.open: shutter1
+    on_double_click: 
+        - cover.stop: shutter1
+  
+
+  - platform: gpio
+    id: down_button
+    pin:
+      number: GPIO5
+      inverted: true
+    on_press:
+      - lambda: !lambda |-
+          if (id(shutter1).current_operation == CoverOperation::COVER_OPERATION_IDLE) {
+            id(shutter1).close();
+          } else {
+            id(shutter1).stop();
+          }
+    on_double_click: 
+        - cover.stop: shutter1
+
+
+cover:
+  - platform: time_based
+    name: "Rolladen"
+    assumed_state: True
+    id: shutter1
+    device_class: shutter
+
+    open_action:
+      - switch.turn_on: up_relay
+      - light.turn_on: light_up
+    open_duration: 18s
+
+    close_action:
+      - switch.turn_on: down_relay
+      - light.turn_on: light_down
+    close_duration: 18s
+
+    stop_action:
+      - switch.turn_off: up_relay
+      - switch.turn_off: down_relay
+      - light.turn_off: light_down
+      - light.turn_off: light_up
+      
+
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "${friendly_name} IP Address"
+    ssid:
+      name: ${friendly_name} SSID
+    bssid:
+      name: ${friendly_name} BSSID
+    mac_address:
+      name: ${friendly_name} Mac Wifi Address
+     
+time:
+  - platform: sntp
+    id: my_time

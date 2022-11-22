@@ -1,0 +1,12 @@
+substitutions:
+  name: athom-sw02-10259d
+packages:
+  athom.sw02: github://athom-tech/athom-configs/athom-sw02.yaml
+esphome:
+  name: ${name}
+  name_add_mac_suffix: false
+
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
